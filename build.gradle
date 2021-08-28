@@ -1,0 +1,97 @@
+buildscript {
+    repositories {
+        mavenCentral()
+        jcenter()
+        maven {
+            name = "forge"
+            url = "http://files.minecraftforge.net/maven"
+        }
+        maven {
+            name = "sonatype"
+            url = "https://oss.sonatype.org/content/repositories/snapshots/"
+        }
+    }
+    dependencies {
+        classpath 'net.minecraftforge.gradle:ForgeGradle:2.3-SNAPSHOT'
+        classpath 'com.github.jengelman.gradle.plugins:shadow:1.2.3'
+    }
+    ext {
+        forgeversion = "14.23.4.2705"
+        mcversion = "1.12.2"
+    }
+}
+
+apply plugin: 'net.minecraftforge.gradle.forge'
+apply plugin: 'com.github.johnrengelman.shadow'
+
+group = 'org.enginehub'
+version = '1.0'
+archivesBaseName = 'ForgeUtils'
+
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
+
+minecraft {
+    version = mcversion + "-" + forgeversion
+
+    runDir = "eclipse"
+
+    replace "%VERSION%", version + "-" + forgeversion + ";" + project.version
+    replaceIn "org/enginehub/util/forge/ForgeUtils.java"
+
+    mappings = "snapshot_20180611"
+}
+
+dependencies {
+    compile group: 'com.google.code.gson', name: 'gson', version:'2.3.1'
+    compile group: 'org.beanshell', name: 'bsh', version:'2.0b5'
+}
+
+processResources {
+    // this will ensure that this task is redone when the versions change.
+    inputs.property "internalVersion", project.version
+    inputs.property "forgeVersion", forgeversion
+    inputs.property "mcversion", mcversion
+
+    // replace stuff in mcmod.info, nothing else
+    from(sourceSets.main.resources.srcDirs) {
+        include 'mcmod.info'
+                
+        // replace version and mcversion
+        expand 'mcversion': project.minecraft.version,
+                'internalVersion': project.version,
+                'forgeVersion': forgeversion
+    }
+
+    // copy everything else, thats not the mcmod.info
+    from(sourceSets.main.resources.srcDirs) {
+        exclude 'mcmod.info'
+    }
+}
+
+shadowJar {
+    dependencies {
+        include(dependency('org.beanshell:bsh'))
+        relocate('bsh', 'org.enginehub.util.bsh')
+        exclude 'net/minecraftforge/**'
+        exclude 'Gradle*'
+        exclude '.cache'
+    }
+}
+
+reobf {
+    shadowJar {
+        mappingType = 'SEARGE'
+    }
+}
+
+task deobfJar(type: Jar) {
+    from sourceSets.main.output
+    classifier = 'dev'
+}
+
+artifacts {
+    archives deobfJar
+}
+
+build.dependsOn(shadowJar)
