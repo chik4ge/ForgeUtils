@@ -48,7 +48,7 @@ public class ForgeUtils {
 
         try {
             if ("true".equalsIgnoreCase(System.getProperty("enginehub.dumpblocks"))) {
-                (new BlockRegistryDumper(new File("blocks.json"))).run();
+                (new BlockRegistryDumper(new File("extrablocks.json"))).run();
             }
             if ("true".equalsIgnoreCase(System.getProperty("enginehub.dumpitems"))) {
                 (new ItemRegistryDumper(new File("items.json"))).run();

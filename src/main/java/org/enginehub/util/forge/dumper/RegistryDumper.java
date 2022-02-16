@@ -2,6 +2,7 @@ package org.enginehub.util.forge.dumper;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import net.minecraft.block.Block;
 import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.registries.IForgeRegistry;
 import net.minecraftforge.registries.IForgeRegistryEntry;
@@ -11,10 +12,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.lang.reflect.Field;
-import java.util.Comparator;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 abstract class RegistryDumper<V extends IForgeRegistryEntry<V>> {
 
@@ -35,9 +33,19 @@ abstract class RegistryDumper<V extends IForgeRegistryEntry<V>> {
     public void run() {
         List<Map<String, Object>> list = new LinkedList<>();
 
-        IForgeRegistry<V> registry = getRegistry();
-        for (Map.Entry<ResourceLocation, V> e : registry.getEntries()) {
-            list.addAll(getProperties(e));
+//        IForgeRegistry<V> registry = getRegistry();
+//        for (Map.Entry<ResourceLocation, V> e : registry.getEntries()) {
+//            list.addAll(getProperties(e));
+//        }
+        Iterator<Block> iter = Block.REGISTRY.iterator();
+        while (iter.hasNext())
+        {
+            Block block = iter.next();
+
+            if (block != null && block.getRegistryName() != null)
+            {
+                list.addAll(getProperties((Map.Entry<ResourceLocation, V>) new AbstractMap.SimpleEntry<>(block.getRegistryName(), block)));
+            }
         }
 
         list.sort(getComparator());

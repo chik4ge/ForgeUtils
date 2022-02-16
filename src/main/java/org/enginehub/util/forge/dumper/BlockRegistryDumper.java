@@ -69,6 +69,7 @@ public class BlockRegistryDumper extends RegistryDumper<Block> {
         Collection<IProperty<?>> props = bs.getProperties();
         IProperty shape = null;
         for (IProperty prop : props) {
+//            ミニチュリの窓枠用
             if (prop.getName().equals("shape")){
                 Collection<Comparable> values =  prop.getAllowedValues();
                 int[] rl = new int[2];
@@ -269,45 +270,45 @@ public class BlockRegistryDumper extends RegistryDumper<Block> {
                             stateMap.put("direction", new Vec3i(1, 0, 1));
                             break;
                         case "x_n":
-                            stateMap.put("direction", new Vec3i(1, 0, -1));
+                            stateMap.put("direction", new Vec3d(0.5, 0, -1));
                             addAfter = new LinkedHashMap<>();
                             addAfter.put("data", dv);
-                            addAfter.put("direction", new Vec3i(-1, 0, -1));
+                            addAfter.put("direction", new Vec3d(-0.5, 0, -1));
                             addAfterName = "-x_n";
                             break;
                         case "x_m":
-                            stateMap.put("direction", new Vec3i(1, 0, 0));
+                            stateMap.put("direction", new Vec3d(0.5, 0, 0));
                             addAfter = new LinkedHashMap<>();
                             addAfter.put("data", dv);
-                            addAfter.put("direction", new Vec3i(-1, 0, 0));
+                            addAfter.put("direction", new Vec3d(-0.5, 0, 0));
                             addAfterName = "-x_m";
                             break;
                         case "x_s":
-                            stateMap.put("direction", new Vec3i(1, 0, 1));
+                            stateMap.put("direction", new Vec3d(0.5, 0, 1));
                             addAfter = new LinkedHashMap<>();
                             addAfter.put("data", dv);
-                            addAfter.put("direction", new Vec3i(-1, 0, 1));
+                            addAfter.put("direction", new Vec3d(-0.5, 0, 1));
                             addAfterName = "-x_s";
                             break;
                         case "z_w":
-                            stateMap.put("direction", new Vec3i(-1, 0, 1));
+                            stateMap.put("direction", new Vec3d(-1, 0, 0.5));
                             addAfter = new LinkedHashMap<>();
                             addAfter.put("data", dv);
-                            addAfter.put("direction", new Vec3i(-1, 0, -1));
+                            addAfter.put("direction", new Vec3d(-1, 0, -0.5));
                             addAfterName = "-z_w";
                             break;
                         case "z_m":
-                            stateMap.put("direction", new Vec3i(0, 0, 1));
+                            stateMap.put("direction", new Vec3d(0, 0, 0.5));
                             addAfter = new LinkedHashMap<>();
                             addAfter.put("data", dv);
-                            addAfter.put("direction", new Vec3i(0, 0, -1));
+                            addAfter.put("direction", new Vec3d(0, 0, -0.5));
                             addAfterName = "-z_m";
                             break;
                         case "z_e":
-                            stateMap.put("direction", new Vec3i(1, 0, 1));
+                            stateMap.put("direction", new Vec3d(1, 0, 0.5));
                             addAfter = new LinkedHashMap<>();
                             addAfter.put("data", dv);
-                            addAfter.put("direction", new Vec3i(1, 0, -1));
+                            addAfter.put("direction", new Vec3d(1, 0, -0.5));
                             addAfterName = "-z_e";
                             break;
                     }
