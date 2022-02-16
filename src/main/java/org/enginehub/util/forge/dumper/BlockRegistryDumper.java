@@ -70,7 +70,7 @@ public class BlockRegistryDumper extends RegistryDumper<Block> {
         IProperty shape = null;
         for (IProperty prop : props) {
 //            ミニチュリの窓枠用
-            if (prop.getName().equals("shape")){
+            if (prop.getName().equals("shape") || prop.getName().equals("position")){
                 Collection<Comparable> values =  prop.getAllowedValues();
                 int[] rl = new int[2];
                 Collection<String> names = values.stream().map(prop::getName).collect(Collectors.toCollection(HashSet::new));
@@ -92,7 +92,7 @@ public class BlockRegistryDumper extends RegistryDumper<Block> {
         for (IProperty prop : props) {
             if (prop.getName().equals("facing") && shape!=null) {
                 map.put(prop.getName(), dataValues(b, prop, shape));
-            } else if (!(prop.getName().equals("shape") && shape!=null)) {
+            } else if (!((prop.getName().equals("shape") || prop.getName().equals("position")) && shape!=null)) {
                 map.put(prop.getName(), dataValues(b, prop, null));
             }
         }
@@ -336,7 +336,7 @@ public class BlockRegistryDumper extends RegistryDumper<Block> {
 
                     dvs.add(dv);
 
-                    if (prop.getName().equals("facing") && prop2.getName().equals("shape")) {
+                    if (prop.getName().equals("facing") && (prop2.getName().equals("shape") || prop2.getName().equals("position"))) {
                         Vec3i vec = EnumFacing.byName(val.toString()).getDirectionVec();
                         Vec3i cp = new Vec3i(0, 0, 0);
                         if (prop2.getName(val2).equals("right")) {
