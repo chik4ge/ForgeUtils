@@ -64,12 +64,23 @@ public class BlockRegistryDumper extends RegistryDumper<Block> {
     }
 
     private Map<String, Map> getStates(Block b) {
+        // ブロックの方向とダメージ値を紐付ける (一応向きに紐づかないプロパティもやる)
+        // ブロック名: { "facing": { "north": { "data": 0, "direction": [ 0.0, 0.0, 1.0 ]}, ... }, ... }
+        // 基本的には方角を表すプロパティはfacingのみだが、MiniaTuriaなど例外的に2つのプロパティを複合して方角を表すものがある
+        // ex. miniaturia_mod:mt_winframe_... -> facing, shape
+
+        // そういったブロックに対しては、方角を表すプロパティを特定した上でnorth-leftのように複合したプロパティ名を作成する
+
+        // また、dataMaskはそのプロパティが変更しうるbitを全て立てた値となる
+        // 例えば、下位1ビットがvariant、下から2ビット目がfacingの場合、dataMaskは3となる
+        // つまり、向きを表すプロパティが2つ以上ある場合には、dataMaskはそれぞれのプロパティのbitを全て立てた値となる
+
         Map<String, Map> map = new LinkedHashMap<>();
         BlockStateContainer bs = b.getBlockState();
         Collection<IProperty<?>> props = bs.getProperties();
+
         IProperty shape = null;
         for (IProperty prop : props) {
-//            ミニチュリの窓枠用
             if (prop.getName().equals("shape") || prop.getName().equals("position")){
                 Collection<Comparable> values =  prop.getAllowedValues();
                 int[] rl = new int[2];
@@ -90,10 +101,14 @@ public class BlockRegistryDumper extends RegistryDumper<Block> {
         }
 
         for (IProperty prop : props) {
-            if (prop.getName().equals("facing") && shape!=null) {
+            if (prop.getName().equals("facing") && shape!=null) { // MiniaTuriaの窓枠用
                 map.put(prop.getName(), dataValues(b, prop, shape));
-            } else if (!((prop.getName().equals("shape") || prop.getName().equals("position")) && shape!=null)) {
-                map.put(prop.getName(), dataValues(b, prop, null));
+            } else {
+                if ((prop.getName().equals("shape") || prop.getName().equals("position")) && shape != null) {
+                    // facingですでにshapeとpositionを処理しているので、ここでは処理しない
+                    continue;
+                }
+                map.put(prop.getName(), dataValues(b, prop));
             }
         }
 
@@ -119,7 +134,6 @@ public class BlockRegistryDumper extends RegistryDumper<Block> {
             new Vec3d(-0.5, 0, -1)
     };
 
-
     private Vec3i addDirection(Object orig, Vec3i addend) {
         if (orig instanceof Vec3i) {
             Vec3i ov = ((Vec3i) orig);
@@ -128,92 +142,91 @@ public class BlockRegistryDumper extends RegistryDumper<Block> {
         return addend;
     }
 
-    private Map<String, Object> dataValues(Block b, IProperty prop, IProperty prop2) {
-        //BlockState bs = b.getBlockState();
+    private Map<String, Object> dataValues(Block b, IProperty prop) {
         IBlockState base = b.getStateFromMeta(0);
 
         Map<String, Object> dataMap = new LinkedHashMap<>();
         Map<String, Object> valueMap = new LinkedHashMap<>();
         List<Integer> dvs = new ArrayList<>();
-        if (prop2 == null) {
-            for (Comparable val : (Iterable<Comparable>) prop.getAllowedValues()) {
-                Map<String, Object> stateMap = new LinkedHashMap<>();
-                int dv = b.getMetaFromState(base.withProperty(prop, val));
-                stateMap.put("data", dv);
 
-                Map<String, Object> addAfter = null;
-                String addAfterName = null;
+        for (Comparable val : (Iterable<Comparable>) prop.getAllowedValues()) {
+            Map<String, Object> stateMap = new LinkedHashMap<>();
+            int dv = b.getMetaFromState(base.withProperty(prop, val));
+            stateMap.put("data", dv);
 
-                dvs.add(dv);
+            Map<String, Object> addAfter = null;
+            String addAfterName = null;
 
-                if (prop.getName().equals("facing") && (
-                        b.getRegistryName().toString().matches("miniaturia_mod:mt_.*_column") ||
-                        b.getRegistryName().toString().matches("miniaturia_mod:mt_wallside_molded_."))) {
-                    switch (prop.getName(val)) {
-                        case "south":
-                            stateMap.put("direction", new Vec3i(1, 0, 0));
-                            break;
-                        case "north":
-                            stateMap.put("direction", new Vec3i(-1, 0, 0));
-                            break;
-                        case "west":
-                            stateMap.put("direction", new Vec3i(0, 0, 1));
-                            break;
-                        case "east":
-                            stateMap.put("direction", new Vec3i(0, 0, -1));
-                            break;
-                    }
+            dvs.add(dv);
+
+            if (prop.getName().equals("facing") && (
+                    b.getRegistryName().toString().matches("miniaturia_mod:mt_.*_column") ||
+                            b.getRegistryName().toString().matches("miniaturia_mod:mt_wallside_molded_."))) {
+                switch (prop.getName(val)) {
+                    case "south":
+                        stateMap.put("direction", new Vec3i(1, 0, 0));
+                        break;
+                    case "north":
+                        stateMap.put("direction", new Vec3i(-1, 0, 0));
+                        break;
+                    case "west":
+                        stateMap.put("direction", new Vec3i(0, 0, 1));
+                        break;
+                    case "east":
+                        stateMap.put("direction", new Vec3i(0, 0, -1));
+                        break;
                 }
-                else if (prop instanceof PropertyDirection) {
-                    Vec3i vec = EnumFacing.byName(val.toString()).getDirectionVec();
-                    stateMap.put("direction", addDirection(stateMap.get("direction"), vec));
-                } else if (prop.getName().equals("half")) {
-                    if (prop.getName(val).equals("top")) {
-                        stateMap.put("direction", addDirection(stateMap.get("direction"), new Vec3i(0, 1, 0)));
-                    } else if (prop.getName(val).equals("bottom")) {
-                        stateMap.put("direction", addDirection(stateMap.get("direction"), new Vec3i(0, -1, 0)));
-                    }
-                } else if (prop.getName().equals("axis")) {
-                    switch (prop.getName(val)) {
-                        case "x":
-                            stateMap.put("direction", new Vec3i(1, 0, 0));
-                            addAfter = new LinkedHashMap<>();
-                            addAfter.put("data", dv);
-                            addAfter.put("direction", new Vec3i(-1, 0, 0));
-                            addAfterName = "-x";
-                            break;
-                        case "y":
-                            stateMap.put("direction", new Vec3i(0, 1, 0));
-                            addAfter = new LinkedHashMap<>();
-                            addAfter.put("data", dv);
-                            addAfter.put("direction", new Vec3i(0, -1, 0));
-                            addAfterName = "-y";
-                            break;
-                        case "z":
-                            stateMap.put("direction", new Vec3i(0, 0, 1));
-                            addAfter = new LinkedHashMap<>();
-                            addAfter.put("data", dv);
-                            addAfter.put("direction", new Vec3i(0, 0, -1));
-                            addAfterName = "-z";
-                            break;
-                    }
-                } else if (prop.getName().equals("rotation")) {
-                    stateMap.put("direction", rotations[Integer.parseInt(prop.getName(val))]);
-                } else if (prop.getName().equals("facing")) { // usually already instanceof PropertyDirection, unless it's a lever
-                    switch (prop.getName(val)) {
-                        case "south":
-                            stateMap.put("direction", new Vec3i(0, 0, 1));
-                            break;
-                        case "north":
-                            stateMap.put("direction", new Vec3i(0, 0, -1));
-                            break;
-                        case "west":
-                            stateMap.put("direction", new Vec3i(-1, 0, 0));
-                            break;
-                        case "east":
-                            stateMap.put("direction", new Vec3i(1, 0, 0));
-                            break;
-                    }
+            }
+            else if (prop instanceof PropertyDirection) {
+                Vec3i vec = EnumFacing.byName(val.toString()).getDirectionVec();
+                stateMap.put("direction", addDirection(stateMap.get("direction"), vec));
+            } else if (prop.getName().equals("half")) {
+                if (prop.getName(val).equals("top")) {
+                    stateMap.put("direction", addDirection(stateMap.get("direction"), new Vec3i(0, 1, 0)));
+                } else if (prop.getName(val).equals("bottom")) {
+                    stateMap.put("direction", addDirection(stateMap.get("direction"), new Vec3i(0, -1, 0)));
+                }
+            } else if (prop.getName().equals("axis")) {
+                switch (prop.getName(val)) {
+                    case "x":
+                        stateMap.put("direction", new Vec3i(1, 0, 0));
+                        addAfter = new LinkedHashMap<>();
+                        addAfter.put("data", dv);
+                        addAfter.put("direction", new Vec3i(-1, 0, 0));
+                        addAfterName = "-x";
+                        break;
+                    case "y":
+                        stateMap.put("direction", new Vec3i(0, 1, 0));
+                        addAfter = new LinkedHashMap<>();
+                        addAfter.put("data", dv);
+                        addAfter.put("direction", new Vec3i(0, -1, 0));
+                        addAfterName = "-y";
+                        break;
+                    case "z":
+                        stateMap.put("direction", new Vec3i(0, 0, 1));
+                        addAfter = new LinkedHashMap<>();
+                        addAfter.put("data", dv);
+                        addAfter.put("direction", new Vec3i(0, 0, -1));
+                        addAfterName = "-z";
+                        break;
+                }
+            } else if (prop.getName().equals("rotation")) {
+                stateMap.put("direction", rotations[Integer.parseInt(prop.getName(val))]);
+            } else if (prop.getName().equals("facing")) { // usually already instanceof PropertyDirection, unless it's a lever
+                switch (prop.getName(val)) {
+                    case "south":
+                        stateMap.put("direction", new Vec3i(0, 0, 1));
+                        break;
+                    case "north":
+                        stateMap.put("direction", new Vec3i(0, 0, -1));
+                        break;
+                    case "west":
+                        stateMap.put("direction", new Vec3i(-1, 0, 0));
+                        break;
+                    case "east":
+                        stateMap.put("direction", new Vec3i(1, 0, 0));
+                        break;
+                }
                 /*
                 // TODO fix these levers. they disappear right now
                 // excluding them just means they won't get rotated
@@ -242,123 +255,152 @@ public class BlockRegistryDumper extends RegistryDumper<Block> {
                     addAfter.put("direction", new Vec3i(0, -1, -1));
                     addAfterName = "down_-z";
                 }*/
-                } else if (prop.getName().equals("poleshape") || prop.getName().equals("position")) {
+            } else if (prop.getName().equals("poleshape") || prop.getName().equals("position")) {
 //                ここからみにちゅり用
-                    switch (prop.getName(val)) {
-                        case "s":
-                            stateMap.put("direction", new Vec3i(0, 0, 1));
-                            break;
-                        case "sw":
-                            stateMap.put("direction", new Vec3i(-1, 0, 1));
-                            break;
-                        case "w":
-                            stateMap.put("direction", new Vec3i(-1, 0, 0));
-                            break;
-                        case "nw":
-                            stateMap.put("direction", new Vec3i(-1, 0, -1));
-                            break;
-                        case "n":
-                            stateMap.put("direction", new Vec3i(0, 0, -1));
-                            break;
-                        case "ne":
-                            stateMap.put("direction", new Vec3i(1, 0, -1));
-                            break;
-                        case "e":
-                            stateMap.put("direction", new Vec3i(1, 0, 0));
-                            break;
-                        case "se":
-                            stateMap.put("direction", new Vec3i(1, 0, 1));
-                            break;
-                        case "x_n":
-                            stateMap.put("direction", new Vec3d(0.5, 0, -1));
-                            addAfter = new LinkedHashMap<>();
-                            addAfter.put("data", dv);
-                            addAfter.put("direction", new Vec3d(-0.5, 0, -1));
-                            addAfterName = "-x_n";
-                            break;
-                        case "x_m":
-                            stateMap.put("direction", new Vec3d(0.5, 0, 0));
-                            addAfter = new LinkedHashMap<>();
-                            addAfter.put("data", dv);
-                            addAfter.put("direction", new Vec3d(-0.5, 0, 0));
-                            addAfterName = "-x_m";
-                            break;
-                        case "x_s":
-                            stateMap.put("direction", new Vec3d(0.5, 0, 1));
-                            addAfter = new LinkedHashMap<>();
-                            addAfter.put("data", dv);
-                            addAfter.put("direction", new Vec3d(-0.5, 0, 1));
-                            addAfterName = "-x_s";
-                            break;
-                        case "z_w":
-                            stateMap.put("direction", new Vec3d(-1, 0, 0.5));
-                            addAfter = new LinkedHashMap<>();
-                            addAfter.put("data", dv);
-                            addAfter.put("direction", new Vec3d(-1, 0, -0.5));
-                            addAfterName = "-z_w";
-                            break;
-                        case "z_m":
-                            stateMap.put("direction", new Vec3d(0, 0, 0.5));
-                            addAfter = new LinkedHashMap<>();
-                            addAfter.put("data", dv);
-                            addAfter.put("direction", new Vec3d(0, 0, -0.5));
-                            addAfterName = "-z_m";
-                            break;
-                        case "z_e":
-                            stateMap.put("direction", new Vec3d(1, 0, 0.5));
-                            addAfter = new LinkedHashMap<>();
-                            addAfter.put("data", dv);
-                            addAfter.put("direction", new Vec3d(1, 0, -0.5));
-                            addAfterName = "-z_e";
-                            break;
-                    }
-                } else if (prop.getName().equals("up")) {
-                    if (prop.getName(val).equals("true")) {
-                        stateMap.put("direction", addDirection(stateMap.get("direction"), new Vec3i(0, 1, 0)));
-                    } else if (prop.getName(val).equals("false")) {
-                        stateMap.put("direction", addDirection(stateMap.get("direction"), new Vec3i(0, -1, 0)));
-                    }
+                switch (prop.getName(val)) {
+                    case "s":
+                        stateMap.put("direction", new Vec3i(0, 0, 1));
+                        break;
+                    case "sw":
+                        stateMap.put("direction", new Vec3i(-1, 0, 1));
+                        break;
+                    case "w":
+                        stateMap.put("direction", new Vec3i(-1, 0, 0));
+                        break;
+                    case "nw":
+                        stateMap.put("direction", new Vec3i(-1, 0, -1));
+                        break;
+                    case "n":
+                        stateMap.put("direction", new Vec3i(0, 0, -1));
+                        break;
+                    case "ne":
+                        stateMap.put("direction", new Vec3i(1, 0, -1));
+                        break;
+                    case "e":
+                        stateMap.put("direction", new Vec3i(1, 0, 0));
+                        break;
+                    case "se":
+                        stateMap.put("direction", new Vec3i(1, 0, 1));
+                        break;
+                    case "x_n":
+                        stateMap.put("direction", new Vec3d(0.5, 0, -1));
+                        addAfter = new LinkedHashMap<>();
+                        addAfter.put("data", dv);
+                        addAfter.put("direction", new Vec3d(-0.5, 0, -1));
+                        addAfterName = "-x_n";
+                        break;
+                    case "x_m":
+                        stateMap.put("direction", new Vec3d(0.5, 0, 0));
+                        addAfter = new LinkedHashMap<>();
+                        addAfter.put("data", dv);
+                        addAfter.put("direction", new Vec3d(-0.5, 0, 0));
+                        addAfterName = "-x_m";
+                        break;
+                    case "x_s":
+                        stateMap.put("direction", new Vec3d(0.5, 0, 1));
+                        addAfter = new LinkedHashMap<>();
+                        addAfter.put("data", dv);
+                        addAfter.put("direction", new Vec3d(-0.5, 0, 1));
+                        addAfterName = "-x_s";
+                        break;
+                    case "z_w":
+                        stateMap.put("direction", new Vec3d(-1, 0, 0.5));
+                        addAfter = new LinkedHashMap<>();
+                        addAfter.put("data", dv);
+                        addAfter.put("direction", new Vec3d(-1, 0, -0.5));
+                        addAfterName = "-z_w";
+                        break;
+                    case "z_m":
+                        stateMap.put("direction", new Vec3d(0, 0, 0.5));
+                        addAfter = new LinkedHashMap<>();
+                        addAfter.put("data", dv);
+                        addAfter.put("direction", new Vec3d(0, 0, -0.5));
+                        addAfterName = "-z_m";
+                        break;
+                    case "z_e":
+                        stateMap.put("direction", new Vec3d(1, 0, 0.5));
+                        addAfter = new LinkedHashMap<>();
+                        addAfter.put("data", dv);
+                        addAfter.put("direction", new Vec3d(1, 0, -0.5));
+                        addAfterName = "-z_e";
+                        break;
                 }
-                valueMap.put(prop.getName(val), stateMap);
-                if (addAfter != null) {
-                    valueMap.put(addAfterName, addAfter);
+            } else if (prop.getName().equals("up")) {
+                if (prop.getName(val).equals("true")) {
+                    stateMap.put("direction", addDirection(stateMap.get("direction"), new Vec3i(0, 1, 0)));
+                } else if (prop.getName(val).equals("false")) {
+                    stateMap.put("direction", addDirection(stateMap.get("direction"), new Vec3i(0, -1, 0)));
                 }
             }
-        } else {
-            for (Comparable val : (Iterable<Comparable>) prop.getAllowedValues()) {
-                for (Comparable val2 : (Iterable<Comparable>) prop2.getAllowedValues()) {
-                    Map<String, Object> stateMap = new LinkedHashMap<>();
-                    int dv = b.getMetaFromState(base.withProperty(prop, val).withProperty(prop2, val2));
-                    stateMap.put("data", dv);
-
-                    Map<String, Object> addAfter = null;
-                    String addAfterName = null;
-
-                    dvs.add(dv);
-
-                    if (prop.getName().equals("facing") && (prop2.getName().equals("shape") || prop2.getName().equals("position"))) {
-                        Vec3i vec = EnumFacing.byName(val.toString()).getDirectionVec();
-                        Vec3i cp = new Vec3i(0, 0, 0);
-                        if (prop2.getName(val2).equals("right")) {
-                            cp = vec.crossProduct(new Vec3i(0, -1, 0));
-                        } else if (prop2.getName(val2).equals("left")) {
-                            cp = vec.crossProduct(new Vec3i(0, 1, 0));
-                        }
-                        Vec3d nvec = new Vec3d(vec.getX()+ cp.getX()*.5, vec.getY()+ cp.getY()*.5, vec.getZ()+ cp.getZ()*.5);
-                        stateMap.put("direction", nvec);
-                    }
-
-                    valueMap.put(prop.getName(val)+"-"+prop2.getName(val2), stateMap);
-                    if (addAfter != null) {
-                        valueMap.put(addAfterName, addAfter);
-                    }
-                }
+            valueMap.put(prop.getName(val), stateMap);
+            if (addAfter != null) {
+                valueMap.put(addAfterName, addAfter);
             }
         }
+
         // attempt to calc mask
         int dataMask = 0;
         for (int dv : dvs) {
             dataMask |= dv;
+        }
+        dataMap.put("dataMask", dataMask);
+
+        dataMap.put("values", valueMap);
+        return dataMap;
+    }
+
+    private Map<String, Object> dataValues(Block b, IProperty prop1, IProperty prop2) {
+        //BlockState bs = b.getBlockState();
+        IBlockState base = b.getStateFromMeta(0);
+
+        Map<String, Object> dataMap = new LinkedHashMap<>();
+        Map<String, Object> valueMap = new LinkedHashMap<>();
+
+        List<Integer> metaFromStates = new ArrayList<>(); // for dataMask
+
+        for (Comparable val1 : (Iterable<Comparable>) prop1.getAllowedValues()) {
+            for (Comparable val2 : (Iterable<Comparable>) prop2.getAllowedValues()) {
+                Map<String, Object> stateMap = new LinkedHashMap<>();
+                int metaFromState = b.getMetaFromState(base.withProperty(prop1, val1).withProperty(prop2, val2));
+                stateMap.put("data", metaFromState);
+
+                Map<String, Object> addAfter = null;
+                String addAfterName = null;
+
+                metaFromStates.add(metaFromState);
+
+                if (prop1.getName().equals("facing") && (prop2.getName().equals("shape") || prop2.getName().equals("position"))) {
+                    Vec3i vec = EnumFacing.byName(val1.toString()).getDirectionVec();
+
+                    // 外積を取り、向いている方向に対しxy平面で90度回転させる
+                    // middleとmiddle2は方向が同じで広さが違うため、上下方向のベクトルを足す
+                    Vec3i shapeVec = new Vec3i(0, 0, 0);
+                    if (prop2.getName(val2).equals("right")) {
+                        shapeVec = vec.crossProduct(new Vec3i(0, -1, 0));
+                    } else if (prop2.getName(val2).equals("left")) {
+                        shapeVec = vec.crossProduct(new Vec3i(0, 1, 0));
+                    } else if (prop2.getName(val2).equals("middle2")) {
+                        shapeVec = new Vec3i(0, -1, 0);
+                    }
+
+                    Vec3d compoundVec = new Vec3d(
+                            vec.getX()+ shapeVec.getX()*0.5,
+                            vec.getY()+ shapeVec.getY()*0.5,
+                            vec.getZ()+ shapeVec.getZ()*0.5);
+                    stateMap.put("direction", compoundVec);
+                }
+
+                valueMap.put(prop1.getName(val1)+"-"+prop2.getName(val2), stateMap);
+                if (addAfter != null) {
+                    valueMap.put(addAfterName, addAfter);
+                }
+            }
+        }
+
+        // attempt to calc mask
+        int dataMask = 0;
+        for (int metaFromState : metaFromStates) {
+            dataMask |= metaFromState;
         }
         dataMap.put("dataMask", dataMask);
 

@@ -25,7 +25,7 @@ apply plugin: 'net.minecraftforge.gradle.forge'
 apply plugin: 'com.github.johnrengelman.shadow'
 
 group = 'org.enginehub'
-version = '1.0'
+version = 'for-MiniaTuria-cocricot-v1.4'
 archivesBaseName = 'ForgeUtils'
 
 sourceCompatibility = 1.8
